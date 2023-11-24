@@ -27,7 +27,7 @@ from tqdm import trange
 from sklearn.preprocessing import StandardScaler
 from sklearn.datasets import fetch_openml
 
-
+new_dir = '///'
 def add_job(job, LdirName):
     print(os.path.join(LdirName, (str(job['trial_index']) + ".json")))
     with open(os.path.join(LdirName, (str(job['trial_index']) + ".json")), 'w') as out:
@@ -576,12 +576,19 @@ class FullSHiPModel(SHiPModel):
              "input_file": input_file,
              "const_field": const_field}
         print("request_params", d)
-        r = requests.post(
-            "{}/simulate".format(self._address),
-            json=json.loads(json.dumps(d))
-        )
-        print("content", r.content)
-        return r.content.decode()
+
+        new_job = {'trial_index': i,
+                       'parameters': d['shape'],
+                       'run_tag': run_tag}
+
+        add_job(new_job, new_dir)
+
+        # r = requests.post(
+        #     "{}/simulate".format(self._address),
+        #     json=json.loads(json.dumps(d))
+        # )
+        # print("content", r.content)
+        return 0#r.content.decode()
 
     def request_params(self, condition):
         d = {"shape": list(map(lambda x: round(x, self.params_precision), condition.detach().cpu().numpy().tolist()))}
