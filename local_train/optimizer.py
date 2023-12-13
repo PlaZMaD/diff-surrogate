@@ -15,7 +15,7 @@ import torch
 import time
 import sys
 sys.path.append('../')
-from model import SHiPModel, FullSHiPModel, SimpleSHiPModel
+from sc_model import SHiPModel, FullSHiPModel, SimpleSHiPModel
 from lbfgs import LBFGS, FullBatchLBFGS
 import copy
 from scipy.stats import chi2

@@ -28,14 +28,29 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.datasets import fetch_openml
 
 new_dir = '///'
+# {
+#             'uuid': None,
+#             'container_id': None,
+#             'container_status': 'wait',
+#             'muons_momentum': None,
+#             'veto_points': None
+#         }
 def add_job(job, LdirName):
     print(os.path.join(LdirName, (str(job['trial_index']) + ".json")))
     with open(os.path.join(LdirName, (str(job['trial_index']) + ".json")), 'w') as out:
         json.dump(job, out)
 
+def get_by_uuid(uuid):
+    pass
+
+def get_params(job):
+    pass
+
 def volume_of_frastrum(half_h, area_1, area_2):
     return 1 / 3. * 2 * half_h * (area_1 + area_2 + torch.sqrt(area_1 * area_2))
 
+def get_job_results(job):
+    pass
 
 def calculate_section_volume_with_material(z, f_l, f_r, h_l, h_r, g_l, g_r):
     """
@@ -256,12 +271,12 @@ class SHiPModel(YModel):
         return self._device
 
     def _request_data(self, uuid, wait=True, check_dims=True):
-        r = requests.post("{}/retrieve_result".format(self._address), json={"uuid": uuid})
+        r = get_by_uuid(uuid)   #requests.post("{}/retrieve_result".format(self._address), json={"uuid": uuid})
         r = json.loads(r.content)
         if wait:
             while r["container_status"] not in ["exited", "failed"]:
                 time.sleep(2.)
-                r = requests.post("{}/retrieve_result".format(self._address), json={"uuid": uuid})
+                r = get_by_uuid(uuid)#requests.post("{}/retrieve_result".format(self._address), json={"uuid": uuid})
                 r = json.loads(r.content)
             if r["container_status"] == "failed":
                 raise ValueError("Generation has failed with error {}".format(r.get("message", None)))
@@ -279,10 +294,12 @@ class SHiPModel(YModel):
                           'Y_begin': y_begin, "Y_end": y_end, 'Z': z},
                 "num_repetitions": num_repetitions
             }
-        r = requests.post(
-            "{}/simulate".format(self._address),
-            json=json.loads(json.dumps(d, cls=NumpyEncoder))
-        )
+        job = {}
+        r = add_job(job)
+        # r = requests.post(
+        #     "{}/simulate".format(self._address),
+        #     json=json.loads(json.dumps(d, cls=NumpyEncoder))
+        # )
         print(r.content, d)
         return r.content.decode()
 
@@ -593,16 +610,17 @@ class FullSHiPModel(SHiPModel):
     def request_params(self, condition):
         d = {"shape": list(map(lambda x: round(x, self.params_precision), condition.detach().cpu().numpy().tolist()))}
         print("request_params", d)
-        r = requests.post(
-            "{}/retrieve_params".format(self._address),
-            json=json.loads(json.dumps(d))
-        )
+        r = get_params(job)
+        # r = requests.post(
+        #     "{}/retrieve_params".format(self._address),
+        #     json=json.loads(json.dumps(d))
+        # )
         print("content", r.content)
         return json.loads(r.content)
 
     def loss(self, y, conditions):
         """
-        Vectorised oss function as in Oliver's code
+        Vectorised loss function as in Oliver's code
         :param y: 2D distribution of hits
         :param conditions: full matrix of conditions(magenet and kinematic)
         :return:

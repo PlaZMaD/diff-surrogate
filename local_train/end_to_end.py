@@ -8,7 +8,7 @@ import torch
 import numpy as np
 sys.path.append('../')
 from typing import List, Union
-from model import FullSHiPModel 
+from sc_model import FullSHiPModel
 # from ffjord_ensemble_model import FFJORDModel as FFJORDEnsembleModel
 # from ffjord_model import FFJORDModel
 from gan_model import GANModel
