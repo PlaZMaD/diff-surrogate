@@ -3,7 +3,7 @@ import pyro
 import numpy as np
 from pyro import distributions as dist
 from local_train.base_model import BaseConditionalGenerationOracle
-from sklearn.datasets import load_boston
+# from sklearn.datasets import load_boston
 import torch.nn.functional as F
 import torch.nn as nn
 from scipy.stats import norm
@@ -11,7 +11,7 @@ from pyro import poutine
 import matplotlib.pyplot as plt
 import scipy
 from pyDOE import lhs
-import seaborn as sns
+# import seaborn as sns
 import lhsmdu
 import tqdm
 import requests
@@ -19,8 +19,10 @@ import traceback
 import json
 import time
 import os
-import uproot
+import uproot3 as uproot
 import sys
+
+# from uproot.write.objects.TTree import newtree, newbranch
 
 
 from tqdm import trange
@@ -35,13 +37,32 @@ new_dir = '///'
 #             'muons_momentum': None,
 #             'veto_points': None
 #         }
+# /*
+# assert np.array(r[self.condition_key]).shape[0] == self._psi_dim
+# assert np.array(r[self.kinematics_key]).shape[1] == self._x_dim
+# assert np.array(r[self.hits_key]).shape[1] == self._y_dim
+# */
+tmp_params = None
 def add_job(job, LdirName):
+    print('add job: ', job)
+    global tmp_params
+    tmp_params= job['parameters']
     print(os.path.join(LdirName, (str(job['trial_index']) + ".json")))
-    with open(os.path.join(LdirName, (str(job['trial_index']) + ".json")), 'w') as out:
-        json.dump(job, out)
-
+    # with open(os.path.join(LdirName, (str(job['trial_index']) + ".json")), 'w') as out:
+    #     json.dump(job, out)
+    return 0
+#Pdg, StartX, StartY, StartZ, Px, Py, Pz
 def get_by_uuid(uuid):
-    pass
+    print('get_by_uuid: ', uuid)
+    nevents = np.random.randint(30) + 1
+    kinematics = []
+    global tmp_params
+    for i in range(nevents):
+        tmp_entry = [13, np.random.randn(), np.random.randn(), -1000., np.random.randn()*10, np.random.randn()*10, np.random.randn()*200]
+        print(tmp_entry)
+        kinematics.append(tmp_entry)
+    print(np.array(kinematics))
+    return {'container_status': 'exited',  'veto_points': np.random.rand(nevents, 2)*300.,  'params': tmp_params, 'kinematics': np.array(kinematics)}#'params': tmp_params,'muons_momentum':np.ones((10, 2)),
 
 def get_params(job):
     pass
@@ -236,6 +257,7 @@ class SHiPModel(YModel):
                                      x_dim=x_dim, y_dim=y_dim) # hardcoded values
         self._psi_dist = dist.Delta(psi_init.to(device))
         self._psi_dim = len(psi_init)
+        # print('PSI INIT ', len(psi_init))
         self._device = device
         self._cut_veto = cut_veto
         self._address = address
@@ -249,7 +271,9 @@ class SHiPModel(YModel):
         self.path_to_enhanced = os.path.expanduser("~/muGAN/SHiP_GAN_module/data_files/" +
                                                    "Seed_auxiliary_values_for_enhanced_generation.npy")
         self.root_filename = "gan_sampled_input.root"
-        self.path_to_output_root = os.path.join("/mnt/shipfs/", self.root_filename)
+ #       self.path_to_output_root = os.path.join("/mnt/shipfs/", self.root_filename)
+        self.path_to_output_root = os.path.join(".", self.root_filename)
+
         # self._muGAN = muGAN()
 
     def sample_x(self, num_repetitions):
@@ -272,7 +296,7 @@ class SHiPModel(YModel):
 
     def _request_data(self, uuid, wait=True, check_dims=True):
         r = get_by_uuid(uuid)   #requests.post("{}/retrieve_result".format(self._address), json={"uuid": uuid})
-        r = json.loads(r.content)
+        # r = json.loads(r.content)
         if wait:
             while r["container_status"] not in ["exited", "failed"]:
                 time.sleep(2.)
@@ -281,8 +305,11 @@ class SHiPModel(YModel):
             if r["container_status"] == "failed":
                 raise ValueError("Generation has failed with error {}".format(r.get("message", None)))
         if check_dims and r['container_status'] == "exited":
-            assert np.array(r[self.condition_key]).shape[0] == self._psi_dim
-            assert np.array(r[self.kinematics_key]).shape[1] == self._x_dim
+            print(self.condition_key, np.array(r[self.condition_key]).shape, self._psi_dim,
+                  self.kinematics_key, np.array(r[self.kinematics_key]).shape, self._x_dim,
+                  self.hits_key, np.array(r[self.hits_key]).shape, self._y_dim)
+            assert np.array(r[self.condition_key]).shape[0] == self._psi_dim, f"self._psi_dim"
+            assert np.array(r[self.kinematics_key]).shape[1] == self._x_dim, f"self._x_dim"
             assert np.array(r[self.hits_key]).shape[1] == self._y_dim
         return r
 
@@ -594,9 +621,9 @@ class FullSHiPModel(SHiPModel):
              "const_field": const_field}
         print("request_params", d)
 
-        new_job = {'trial_index': i,
+        new_job = {'trial_index': 0,
                        'parameters': d['shape'],
-                       'run_tag': run_tag}
+                       'run_tag': 0}
 
         add_job(new_job, new_dir)
 
@@ -610,7 +637,7 @@ class FullSHiPModel(SHiPModel):
     def request_params(self, condition):
         d = {"shape": list(map(lambda x: round(x, self.params_precision), condition.detach().cpu().numpy().tolist()))}
         print("request_params", d)
-        r = get_params(job)
+        r = get_params('0')
         # r = requests.post(
         #     "{}/retrieve_params".format(self._address),
         #     json=json.loads(json.dumps(d))

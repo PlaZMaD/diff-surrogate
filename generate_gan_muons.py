@@ -3,11 +3,11 @@ import os
 import sys
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-sys.path.append(os.path.expanduser('~/muGAN'))
+sys.path.append(('D:\Proggy\py_projects\diff-surrogate\muGAN'))
 from SHiP_GAN_module import muGAN
 mu_gan = muGAN()
 
-path_to_enhanced = sys.argv[1]
+path_to_enhanced = 'D:\Proggy\py_projects\diff-surrogate\muGAN\SHiP_GAN_module\data_files\Seed_auxiliary_values_for_enhanced_generation.npy'#'#sys.argv[1]
 num_repetitions = int(sys.argv[2])
 
 seed_auxiliary_distributions = np.load(path_to_enhanced)

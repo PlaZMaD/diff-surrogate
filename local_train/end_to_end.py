@@ -35,7 +35,7 @@ def get_freer_gpu():
 
 
 if torch.cuda.is_available():
-    device = torch.device('cuda:{}'.format(get_freer_gpu()))
+    device = torch.device('cuda:0')#{}'.format(get_freer_gpu()))
 else:
     device = torch.device('cpu')
 print("Using device = {}".format(device))
@@ -282,7 +282,7 @@ def main(model,
     model_cls = str_to_class(model)
     optimizer_cls = str_to_class(optimizer)
 
-    experiment = Experiment(project_name=project_name, workspace=work_space)
+    experiment = Experiment( project_name=project_name, workspace=work_space)
     experiment.add_tags([x.strip() for x in tags.split(',')])
     experiment.log_parameter('model_type', model)
     experiment.log_parameter('optimizer_type', optimizer)
