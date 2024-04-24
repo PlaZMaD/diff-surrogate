@@ -11,8 +11,8 @@ from copy import deepcopy
 from kubernetes import client, config, watch
 import json
 from kub_config import *
-from opt_config import batch_split
-from opt_config import METADATA_TEMPLATE
+# from opt_config import batch_split
+# from opt_config import METADATA_TEMPLATE
 
 def CreateMetaData(point, tag):
     metadata = deepcopy(METADATA_TEMPLATE)
@@ -62,63 +62,6 @@ def to_kube_env(envs) -> list:
     for k, v in envs.items():
         kube_env.append({"name": str(k), "value": str(v)})
     return kube_env
-
-
-# def run_kube_job(job_spec: dict,
-#                  envs: dict,
-#                  job_folder: str,
-#                  timeout: int) -> str:
-#     job_tag = "-".join(job_folder.split("/")[-2:])
-#     job_uuid: str = f"ek-{str(uuid.uuid4())[:5]}-{job_tag}"
-#     job_spec["metadata"]["name"] = job_spec["metadata"]["name"].format(job_uuid)
-#
-#     # DEPRECATED FOR USAGE WITH AZCOPY
-#     # job_spec["spec"]["template"]["spec"]["volumes"][0]["hostPath"]["path"] = job_folder
-#
-#     job_spec["spec"]["template"]["spec"]["containers"][0]["env"] = to_kube_env(envs)
-#     logging.basicConfig(level=logging.INFO)
-#     config_k8s = pykube.KubeConfig.from_file('~/.kube/config')
-#     api = pykube.HTTPClient(config_k8s)
-#     api.timeout = 1e6
-#
-#     job = pykube.Job(api, job_spec)
-#     job.create()
-#     start = datetime.datetime.now()
-#     status = "start"
-#     logging.info(f"JOB: {job_uuid} was started. Tag is {job_tag}")
-#     while (datetime.datetime.now() - start).seconds < timeout:
-#         try:
-#             time.sleep(10)
-#             job.reload()
-#             status = status_checker(job=job)
-#             if status == "succeeded":
-#                 logging.info(f"JOB: {job_uuid} finished. Output in {job_folder}")
-#                 job.delete("Foreground")
-#                 #job.delete()
-#                 return status
-#         except requests.exceptions.HTTPError as exc:
-#             print(f"{exc} {traceback.print_exc()}")
-#     print(f"Timeout {timeout} was exceeded. Deleting the job {job_uuid}")
-#     job.delete("Foreground")
-#     #job.delete()
-#     return status
-
-# def remove_completed():
-    # while (datetime.datetime.now() - start).seconds < timeout:
-    #     try:
-    #         time.sleep(10)
-    #         job.reload()
-    #         status = status_checker(job=job)
-    #         if status == "succeeded":
-    #             logging.info(f"JOB: {job_uuid} finished. Output in {job_folder}")
-    #             job.delete("Foreground")
-    #             #job.delete()
-    #             return status
-    #     except requests.exceptions.HTTPError as exc:
-    #         print(f"{exc} {traceback.print_exc()}")
-    # print(f"Timeout {timeout} was exceeded. Deleting the job {job_uuid}")
-    # job.delete("Foreground")
-    #job.delete()
 
 def run_kube_job_new(api,
                  job_spec: dict,

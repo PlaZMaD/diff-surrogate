@@ -1,9 +1,9 @@
-from opt_utils import ProcessPoint4Server, complete_old_running
-from redis_run_config import *
+#from opt_utils import ProcessPoint4Server, complete_old_running
+#from redis_run_config import *
 import time
-from opt_config import *
+#from opt_config import *
 import json
-from opt_utils import get_list_by_pattern, get_jobs_list
+from opt_utils import get_list_by_pattern, get_jobs_list, ProcessPoint4Server
 import os
 import uuid
 import time
@@ -17,7 +17,6 @@ from multiprocessing import Process
 from kubernetes import client, config
 import json
 from kub_config import *
-from opt_config import batch_split
 from kub_utils import *
 import kubernetes
 

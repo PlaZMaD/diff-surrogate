@@ -4,8 +4,8 @@
 # parameters of server
 K8S_PROXY = 'https://cern-mc43h.ydf.yandex.net:8443'
 
-HOST_OUTPUT_DIRECTORY = "optimization/data/sc_fieldmap_02/"
-HOST_LOCALOUTPUT_DIRECTORY = '/home/ekurbatov/shipfs/optimization/data/sc_fieldmap_02/'
+HOST_OUTPUT_DIRECTORY = "optimization/data/gan_opt_01/"
+HOST_LOCALOUTPUT_DIRECTORY = '/home/ekurbatov/shipfs/optimization/data/gan_opt_01/'
 DOCKER_OUTPUT_DIRECTORY = '/output'
 
 # HOST_SAMPLE_DIRECTORY - local folder in the cluster
@@ -13,6 +13,16 @@ HOST_SAMPLE_DIRECTORY = '/local/ship/background_2018'
 DOCKER_SAMPLE_DIRECTORY = '/sample'
 
 TIMEOUT = 60*60*20
+SLEEP_TIME = 60
+RESTART_TIME = 60*60
+MAX_RESTARTS = 5
+
+checkStats = False
+
+max_batch_N = 40
+batch_split = 20
+
+pool_dir = '../json_config/'
 
 
 JOB_SPEC = {
@@ -95,3 +105,10 @@ JOB_SPEC = {
     }
 }
 
+METADATA_TEMPLATE = {
+    'user': {
+        'tag': '',
+        'params': []
+    },
+    'k8s': {}
+}

@@ -19,9 +19,9 @@ import traceback
 import json
 import time
 import os
-import uproot3 as uproot
+import uproot as uproot
 import sys
-
+from kub_interface import *
 # from uproot.write.objects.TTree import newtree, newbranch
 
 
@@ -301,7 +301,7 @@ class SHiPModel(YModel):
             while r["container_status"] not in ["exited", "failed"]:
                 time.sleep(2.)
                 r = get_by_uuid(uuid)#requests.post("{}/retrieve_result".format(self._address), json={"uuid": uuid})
-                r = json.loads(r.content)
+                #r = json.loads(r.content)
             if r["container_status"] == "failed":
                 raise ValueError("Generation has failed with error {}".format(r.get("message", None)))
         if check_dims and r['container_status'] == "exited":

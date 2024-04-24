@@ -1,180 +1,233 @@
 import pickle
 import json
 import numpy as np
-from commons import FCN,  StripFixedParams, AddFixedParams, ParseParams
+import time
+# from commons import FCN,  StripFixedParams, AddFixedParams, ParseParams
 import copy
-from opt_config import METADATA_TEMPLATE, SLEEP_TIME
+# from opt_config import METADATA_TEMPLATE, SLEEP_TIME
 import os
-from run_kub import *
-from fcn_utils import *
-
+# from run_kub import *
 from sklearn.ensemble import GradientBoostingRegressor
-from skopt import Optimizer
-from skopt.learning import GaussianProcessRegressor, RandomForestRegressor, GradientBoostingQuantileRegressor
-# from ax_configs import dbNumber
-from redis_run_config import db
+
+from kub_config import *
+import uproot
+from os.path import isfile, join
+from copy import deepcopy
+import awkward1 as ak
+from pathlib import Path
+import pandas as pd
 
 
-def StripFixedParams_multipoint(points):
-    return [StripFixedParams(p) for p in points]
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        else:
+            return super(NpEncoder, self).default(obj)
 
 
-def ExtractParams(metadata):
-    params = json.loads(metadata)['user']['params']
-    return ParseParams(params)
+def get_params_from_json(jsonFile):
+    with open(jsonFile) as result_file:
+        result = json.load(result_file)
+        params = np.array(result['params'])
+        params = [float(p) for p in params]
+        W = float(result['w'])
+        W_sc = float(result['w_sc'])
+        return params, W, W_sc
+
+def load_data(dirs, branches, treeName='cbmsim', lazy=False, lLibrary='pd', lCut=None):
+    dataBase = {'fPdgCode': uproot.AsJagged(uproot.AsDtype('>i4')),
+                'fX': uproot.AsJagged(uproot.AsDtype('>f4')),
+                'fY': uproot.AsJagged(uproot.AsDtype('>f4')),
+                'fZ': uproot.AsJagged(uproot.AsDtype('>f4')),
+                'fPx': uproot.AsJagged(uproot.AsDtype('>f4')),
+                'fPy': uproot.AsJagged(uproot.AsDtype('>f4')),
+                'fPz': uproot.AsJagged(uproot.AsDtype('>f4')),
+                'fW': uproot.AsJagged(uproot.AsDtype('>f4')),
+                'fStartX': uproot.AsJagged(uproot.AsDtype('>f4')),
+                'fStartY': uproot.AsJagged(uproot.AsDtype('>f4')),
+                'fStartZ': uproot.AsJagged(uproot.AsDtype('>f4')),
+                'fTrackID': uproot.AsJagged(uproot.AsDtype('>i4')),
+                'fEventId': uproot.AsJagged(uproot.AsDtype('>i4')),
+                'fDetectorID': uproot.AsJagged(uproot.AsDtype('>i4')),
+                'fLength': uproot.AsJagged(uproot.AsDtype('>f4'))
+                }
+
+    if lazy:
+        print("lazy is not implemented")
+        return 0
+    outputs = {}
+    outputs_keys = []
+    for folder in dirs:
+        lFile = folder  # join(folder, filename)
+        if isfile(lFile):
+            key = os.path.dirname(folder)  # basename(os.path.dirname(folder))
+            nRepeats = 1
+            while key in outputs_keys:
+                nRepeats = nRepeats + 1
+                key = key + "_" + str(nRepeats)
+            outputs_keys.append(key)
+            try:
+                lTree = uproot.open(lFile)
+                # print("Open file: {}".format(lFile))
+                if any([treeName in lName for lName in lTree.keys()]):
+                    lTree = lTree[treeName]
+                else:
+                    print("Bad file {}".format(lFile))
+                    print(lTree.keys())
+                    continue
+                outputs[key] = {}
+                # branchdict = {}
+                for branch in branches.keys():
+                    if branch == 'MCEventHeader.':
+                        outputs[key][branch] = lTree[branch].arrays(
+                            ['MCEventHeader.{}'.format(item) for item in branches[branch]],
+                            cut=lCut[branch] if lCut else None, library=lLibrary, how=dict)
+                    else:
+                        outputs[key][branch] = lTree[branch].arrays(
+                            {'{}.{}'.format(branch, item): dataBase[item] for item in branches[branch]},
+                            cut=lCut[branch] if lCut else None, library=lLibrary, how=dict)
+                        # print(key, branch, len(outputs[key][branch]['{}.fPdgCode'.format(branch)]))
+            except OSError:
+                print("bad file {}".format(lFile))
+                continue
+        else:
+            print("no such file ", join(folder, lFile))
+    return outputs
 
 
-def get_result(jobs):
-    # print("get_result call!")
-    results = []
-    weights = np.array([])
-    for i in range(len(jobs['jobs'])):
-        # print(os.path.join(jobs['path'], str(i), 'optimise_input.json'))
-        with open(os.path.join(jobs['path'], str(i), 'optimise_input.json')) as result_file:
-          result = json.load(result_file)
-          rWeights = np.array(result['kinematics'])
-          weights = np.concatenate((weights, rWeights))
-          results.append(result)
-          print('result is: ', jobs['path'])
-    # Only one job per machine calculates the weight and the length
-    # -> take first we find
-    weight = float(results[0]['w'])
-    if weight < 3e6:
-        muons_w = np.sum(weights)
-    else:
-        muons_w = 0
-    return weight, 0, muons_w
 
-def ProcessPoint(jobs, fcn_to_use):
-    try:
-        # X = ExtractParams(jobs['metadata'])
-        print("""os.path.join(jobs['path'], "0", 'optimise_input.json')""")
-        X, W, W_sc = get_params_from_json(os.path.join(jobs['path'], "0", 'optimise_input.json'))
-        print(X, W)
-        fcn_vals = calc_FCNs(jobs['path'], "ship.conical.MuonBack-TGeant4.root",
-                             batch_split,
-                             FCNs,
-                             weight=W,
-                             sc_weight=W_sc)
-        myRedis = redis.Redis(
-            host='localhost',
-            port='6379',
-            db=db['opt_db'])
 
-        for fcn_name, fcn_val in fcn_vals.items():
-            myRedis.hset(json.dumps(X, cls=NpEncoder), fcn_name, fcn_val)
-        myRedis.hset(json.dumps(X, cls=NpEncoder), 'W', W)
-        myRedis.hset(json.dumps(X, cls=NpEncoder), 'iteration', os.path.basename(jobs['path']))
+def calc_FCNs(dirName, fileName, nFiels, weight, sc_weight, tfilter=True, acceptance_limit=(200, 300)):
+    with_snd = True
+    basePath = sorted(Path(dirName).glob(f'*/{fileName}'))
 
-        return X, fcn_vals[fcn_to_use]
-    except Exception as e:
-        print(e)
+    assert len(basePath) % nFiels == 0
 
+    branches_to_load_base = ['fluxDetPoint']
+    snd_planes = 'TTPoint'
+    if with_snd:
+        branches_to_load_base.append(snd_planes)
+    branches_to_load = {}
+    if tfilter:
+        branches_to_load_base.append('strawtubesPoint')
+
+    branches_to_load_base.append('vetoPoint')
+    branches_to_load_base = {
+        i: [k for k in ['fTrackID', 'fPdgCode', 'fX', 'fY', 'fZ', 'fDetectorID', 'fPx', 'fPy', 'fPz', 'fLength']]
+        for i in branches_to_load_base}
+    branches_to_load['MCTrack'] = ['fPdgCode', 'fW']
+    branches_to_load['MCEventHeader.'] = ['fEventId']
+
+    load_branches = deepcopy(branches_to_load)
+    load_branches.update(branches_to_load_base)
+    # ic(deepcopy(branches_to_load).update(branches_to_load_base))
+    base = load_data(basePath, load_branches, lCut=None, lLibrary="ak")
+    for key, data in base.items():
+        lPath = key.split('/')
+        evKey = (int(lPath[-1]) + 1) * 100000000
+        data['MCEventHeader.']['eventID'] = data['MCEventHeader.']['MCEventHeader.fEventId'] + evKey
+
+    tKey = next(iter(base.keys()))
+    root_data = {lkey: {rkey: ak.concatenate([base[i][lkey][rkey] for i in base.keys()], axis=0) for rkey in
+                        base[tKey][lkey].keys()} for lkey in base[tKey].keys()}
+
+    for key in branches_to_load_base:
+        root_data[key]['event_id'] = ak.broadcast_arrays(root_data['MCEventHeader.']['eventID'],
+                                                         ak.zeros_like(root_data[key]['{}.fPdgCode'.format(key)]))[0]
+        if 'MCTrack' not in key:
+            root_data[key]['W'] = root_data['MCTrack']['MCTrack.fW'][root_data[key]['{}.fTrackID'.format(key)]]
+    mu_only_data = {lKey: {key: root_data[lKey][key][abs(root_data[lKey]['{}.fPdgCode'.format(lKey)]) == 13] for key in
+                           root_data[lKey].keys()} for lKey in branches_to_load_base}
+    white_list = None
+    if tfilter:
+        tData = mu_only_data['strawtubesPoint']
+        tflat = pd.DataFrame({key: ak.flatten(tData[key], axis=None) for key in tData.keys()})
+        events_white_list = {}
+        for i in range(4):
+            bName = f"T{4 - i}"
+            bFlat = tflat[tflat['strawtubesPoint.fDetectorID'] >= (4 - i) * 1e7]
+            tflat = tflat[tflat['strawtubesPoint.fDetectorID'] < (4 - i) * 1e7]
+            events_white_list[bName] = pd.unique(bFlat['event_id'])
+
+        filter_mask = np.isin(events_white_list['T1'], events_white_list['T4'])
+        white_list = events_white_list['T1'][filter_mask]
+        t2t3_events = np.unique(np.concatenate(
+            (events_white_list['T1'], events_white_list['T2']), axis=0))
+        filter_mask_23 = np.isin(white_list, t2t3_events)
+        white_list = white_list[filter_mask_23]
+
+    vflat = None
+
+    vData = mu_only_data['vetoPoint']
+    vflat = pd.DataFrame({key: ak.flatten(vData[key], axis=None) for key in vData.keys()})
+    vflat.rename(columns={col: col.split('.')[-1] for col in vflat.columns}, inplace=True)
+    vflat['P'] = np.sqrt(np.square(vflat['fPx']) + np.square(vflat['fPy']) + np.square(vflat['fPz']))
+
+    data = mu_only_data['fluxDetPoint']
+    flat = {key: ak.flatten(data[key], axis=None) for key in data.keys()}
+    dfFlat = pd.DataFrame(flat)
+    reduced = dfFlat.groupby(['event_id', '{}.fTrackID'.format('fluxDetPoint')], as_index=False).mean()
+    reduced.rename(columns={col: col.split('.')[-1] for col in reduced.columns}, inplace=True)
+    reduced['P'] = np.sqrt(np.square(reduced['fPx']) + np.square(reduced['fPy']) + np.square(reduced['fPz']))
+    reduced['Pt'] = np.sqrt(np.square(reduced['fPx']) + np.square(reduced['fPy']))
+    reduced.drop(['fDetectorID', 'fPx', 'fPy', 'fPz'], axis=1, inplace=True)
+    if with_snd:
+        data_snd = mu_only_data[snd_planes]
+        flat_snd = {key: ak.flatten(data_snd[key], axis=None) for key in data_snd.keys()}
+        dfFlat_snd = pd.DataFrame(flat_snd)
+        reduced_snd = dfFlat_snd.groupby(['event_id', '{}.fTrackID'.format(snd_planes)], as_index=False).mean()
+        reduced_snd.rename(columns={col: col.split('.')[-1] for col in reduced_snd.columns}, inplace=True)
+        reduced_snd['P'] = np.sqrt(
+            np.square(reduced_snd['fPx']) + np.square(reduced_snd['fPy']) + np.square(reduced_snd['fPz']))
+        reduced_snd['Pt'] = np.sqrt(np.square(reduced_snd['fPx']) + np.square(reduced_snd['fPy']))
+        reduced_snd.drop(['fDetectorID', 'fPx', 'fPy', 'fPz'], axis=1, inplace=True)
+
+    nRuns = int(len(basePath) / batch_split)
+    if nRuns != 1:
+        print("Strange number of runs")
+    if tfilter:
+        # if white_list is not None:
+        reduced = reduced[reduced['event_id'].isin(white_list)]
+        
+    return reduced
+    #
+    # # if white_list is not None:
+    # if tfilter:
+    #     # if white_list is not None:
+    #     reduced = reduced[reduced['event_id'].isin(white_list)]
+    #     for fcn_name, fcn in FCNs.items():
+    #         if 'veto' not in fcn_name and 'sx' in fcn_name or 'count' in fcn_name or 'tCount' in fcn_name:
+    #             outs[f'{fcn_name}_tracks'] = fcn(reduced, weight + sc_weight, acceptance_limit=acceptance_limit)
+    #     if with_snd:
+    #         outs['v2_tracks'] = v2_fcn(reduced, reduced_snd, weight, sc_weight, momentum_limit=1,
+    #                                    acceptance_limit=(200, 300))
+    # return outs
+
+
+
+def get_root_data():
+    pass
 
 def ProcessPoint4Server(jobs):
     try:
         X, W, W_sc = get_params_from_json(os.path.join(jobs['path'], "0", 'optimise_input.json'))
         print(X, W)
-        fcn_vals = calc_FCNs(jobs['path'], "ship.conical.MuonBack-TGeant4.root",
+        fcn_vals = get_root_data(jobs['path'], "ship.conical.MuonBack-TGeant4.root",
                              batch_split,
-                             FCNs,
                              weight=W, sc_weight=W_sc, tfilter=True)
         return X, W, W_sc, fcn_vals
     except Exception as e:
         print(e)
 
 
-def ProcessPoint_old(jobs):
-    print("process Point: ", jobs)
-    try:
-        weight, _, muons_w = get_result(jobs)
-        print('obtained weights: ', weight, muons_w)
-        y = FCN(weight, muons_w, 0)
-        X = ExtractParams(jobs['metadata'])
-        # print(X, y)
-        return X, y
-    except Exception as e:
-        print(e)
-
-
-def ProcessJobs(jobs, tag, fcn_to_use):
-    print('[{}] Processing jobs...'.format(time.time()))
-    results = [ProcessPoint(point, fcn_to_use) for point in jobs]
-    print(f'Got results {results}')
-    results = [result for result in results if result]
-    return zip(*results) if results else ([], [])
-
-def WaitCompleteness(mpoints):
-    uncompleted_jobs = mpoints
-    work_time = 0
-    restart_counts = 0
-    while True:
-        time.sleep(SLEEP_TIME)
-        print(uncompleted_jobs)
-        uncompleted_jobs = [any([job.is_alive() for job in jobs['jobs']]) for jobs in mpoints]
-
-        if not any(uncompleted_jobs):
-            return mpoints
-
-        print('[{}] Waiting...'.format(time.time()))
-        work_time += 60
-
-        if work_time > 60 * 30 * 1:
-            restart_counts += 1
-            if restart_counts >= 3:
-                print("Too many restarts")
-                raise SystemExit(1)
-            print("Job failed!")
-            #raise SystemExit(1)
-            for jobs in mpoints:
-                if any([job.is_alive() for job in jobs['jobs']]):
-                    [job.terminate() for job in jobs['jobs']]
-                    jobs = run_batch(jobs['metadata'])
-            work_time = 0
-
-
-def CalculatePoints(points, tag, fcn_to_use='count'):
-    tags = {json.dumps(points[i], cls=NpEncoder):str(tag)+'-'+str(i) for i in range(len(points))}
-    shield_jobs = [
-        SubmitKubJobs(point, tags[json.dumps(point, cls=NpEncoder)])
-        for point in points
-    ]
-    print("submitted: \n", points)
-
-    if shield_jobs:
-        shield_jobs = WaitCompleteness(shield_jobs)
-        X_new, y_new = ProcessJobs(shield_jobs, tag, fcn_to_use)
-    return X_new, y_new
-
 def load_points_from_dir(db_name='db.pkl'):
     with open (db_name, 'rb') as f:
         return pickle.load(f)
-
-def CreateOptimizer(clf_type, space, random_state=None):
-    if clf_type == 'rf':
-        clf = Optimizer(
-            space,
-            RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1),
-            random_state=random_state)
-    elif clf_type == 'gb':
-        clf = Optimizer(
-            space,
-            GradientBoostingQuantileRegressor(
-                base_estimator=GradientBoostingRegressor(
-                    n_estimators=100, max_depth=4, loss='quantile')),
-            random_state=random_state)
-    elif clf_type == 'gp':
-        clf = Optimizer(
-            space,
-            GaussianProcessRegressor(
-                alpha=1e-7, normalize_y=True, noise='gaussian'),
-            random_state=random_state)
-    else:
-        clf = Optimizer(
-            space, base_estimator='dummy', random_state=random_state)
-
-    return clf
-
 
 def get_list_by_pattern(rdb, pattern):
     out = []
@@ -213,34 +266,4 @@ def get_jobs_list(dirName):
                         continue
                         #newJobsList.append()
                 os.remove(os.path.join(root, name))
-    return newJobsList
-
-def complete_old_running(runPath):
-    newJobsList = []
-    for root, dirs, files in os.walk(runPath):
-        for name in files:
-            if ".json" in name:
-                new_cand = {}
-                try:
-                    with open(os.path.join(root, name)) as input:
-                        new_cand['trial'] = int(name[:-5])
-                        new_cand['params'] = json.load(input)
-                    os.remove(os.path.join(root, name))
-                except FileNotFoundError:
-                    continue
-                try:
-                    job_l_path = os.path.join(HOST_LOCALOUTPUT_DIRECTORY, name[:-5])
-                    X, W, W_sc = get_params_from_json(os.path.join(job_l_path, "0", 'optimise_input.json'))
-                    fcn_vals = calc_FCNs(job_l_path, "ship.conical.MuonBack-TGeant4.root",
-                                         batch_split,
-                                         FCNs,
-                                         weight=W,
-                                         sc_weight=W_sc)
-
-                    new_cand['W'] = W
-                    new_cand['W_sc'] = W_sc
-                    new_cand['fcns'] = fcn_vals
-                except Exception as e:
-                    print(e)
-                newJobsList.append(new_cand)
     return newJobsList
