@@ -1,14 +1,14 @@
 import os
 import json
 from kub_config import *
-from opt_utils import get_jobs_list_client
+from opt_utils import *#get_jobs_list_client
+
 
 run_dir = os.path.join(pool_dir, 'running')
 new_dir = os.path.join(pool_dir, 'new')
 completed_dir = os.path.join(pool_dir, 'completed')
 
 def retrieve_result(uuid):
-
 
     #check in running and new
     job_list = get_jobs_list_client(run_dir) + get_jobs_list_client(new_dir)
@@ -20,12 +20,13 @@ def retrieve_result(uuid):
     my_job = [job for job in get_jobs_list_client(run_dir) if job['trial_index'] == uuid]
     if len(my_job) != 1:
         print("Too many jobs or job is not found")
-        return None
+        return out
     else:
+        my_job = my_job[0]
         out['container_status'] = 'exited'
-        out['veto_points'] = None#np.random.rand(nevents, 2)*300.
-        out['params'] = None
-        out['kinematics'] = None
+        out['veto_points'] = my_job['veto']#None#np.random.rand(nevents, 2)*300.
+        out['params'] = params2opt(my_job['parameters'])#None
+        out['kinematics'] =  my_job['kinematics'] #None
 
         # tmp_entry = [13, np.random.randn(), np.random.randn(), -1000., np.random.randn() * 10, np.random.randn() * 10,
         #              np.random.randn() * 200]
@@ -49,13 +50,9 @@ def add_job(job, LdirName):
         json.dump(job, out)
 
 def simulate(old_dict):
-
-    # d = {
-    #                 "field": {"Y": 4, "X": 0.0, "Z": 0},
-    #                 "shape": {'X_begin': x_begin, "X_end": x_end,
-    #                           'Y_begin': y_begin, "Y_end": y_end, 'Z': z},
-    #                 "num_repetitions": num_repetitions
-    #             }
     new_dict = old_dict
     new_dict["trial_index"] = old_dict['uuid']
-    add_job(new_dict, pool_dir)
+    new_dict['parameters'] = params2sim(new_dict['shape'])
+    print("simulate", new_dict)
+    add_job(new_dict, new_dir)
+    return new_dict["trial_index"]

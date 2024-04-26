@@ -78,13 +78,13 @@ def listen_jobs_json():
             else:
                 xwy = ProcessPoint4Server(job['proc'])
                 if xwy is not None:
-                    X_new, W, W_sc, y_new = xwy
-                    if y_new['tCount'] < 20 and checkStats and job['restarts'] < 5:
-                        print("Running additional statistics")
-                        jobs_pool[jobID] = {'proc': SubmitKubJobs(job['parameters'], str(job['trial']), api, repeat_flag=True), 'time': 0,
-                                            'restarts': job['restarts'] + 1,
-                                            'trial': job['trial'], 'parameters': job['parameters'], 'tag': job['tag']}
-                        continue
+                    X_new, W, W_sc, veto, kinematics = xwy
+                    # if y_new['tCount'] < 20 and checkStats and job['restarts'] < 5:
+                    #     print("Running additional statistics")
+                    #     jobs_pool[jobID] = {'proc': SubmitKubJobs(job['parameters'], str(job['trial']), api, repeat_flag=True), 'time': 0,
+                    #                         'restarts': job['restarts'] + 1,
+                    #                         'trial': job['trial'], 'parameters': job['parameters'], 'tag': job['tag']}
+                    #     continue
                 else:
                     print("RESTARTING JOB")
                     jobs_pool[jobID] = {'proc': SubmitKubJobs(job['parameters'], str(job['trial']), api), 'time': 0, 'restarts': job['restarts']+1,
@@ -96,7 +96,8 @@ def listen_jobs_json():
                                 'parameters': X_new,
                                 'W': W,
                                 'W_sc': W_sc,
-                                'fcns': y_new}
+                                'veto': veto,
+                                'kinematics': kinematics}
                     if checkStats:
                         out_data.update({'nRuns': job['restarts']+1})
                     json.dump(out_data, output)

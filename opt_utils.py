@@ -193,22 +193,18 @@ def calc_FCNs(dirName, fileName, nFiels, weight, sc_weight, tfilter=True, accept
     if tfilter:
         # if white_list is not None:
         reduced = reduced[reduced['event_id'].isin(white_list)]
-        
-    return reduced
-    #
-    # # if white_list is not None:
-    # if tfilter:
-    #     # if white_list is not None:
-    #     reduced = reduced[reduced['event_id'].isin(white_list)]
-    #     for fcn_name, fcn in FCNs.items():
-    #         if 'veto' not in fcn_name and 'sx' in fcn_name or 'count' in fcn_name or 'tCount' in fcn_name:
-    #             outs[f'{fcn_name}_tracks'] = fcn(reduced, weight + sc_weight, acceptance_limit=acceptance_limit)
-    #     if with_snd:
-    #         outs['v2_tracks'] = v2_fcn(reduced, reduced_snd, weight, sc_weight, momentum_limit=1,
-    #                                    acceptance_limit=(200, 300))
-    # return outs
+        veto = reduced[['fX', 'fY']].values.tolist()
+        kinematics = reduced[['fX','fY','fZ', 'fX','fY','fZ','fPdgCode']].values.tolist()
+    return veto, kinematics
 
+def params2opt(inParams):
 
+    return np.array(inParams)[need2opt]
+
+def params2sim(inParams):
+    new_params = np.array(deepcopy(default_point))
+    new_params[need2opt] = inParams
+    return new_params.tolist()
 
 def get_root_data():
     pass
@@ -217,10 +213,10 @@ def ProcessPoint4Server(jobs):
     try:
         X, W, W_sc = get_params_from_json(os.path.join(jobs['path'], "0", 'optimise_input.json'))
         print(X, W)
-        fcn_vals = get_root_data(jobs['path'], "ship.conical.MuonBack-TGeant4.root",
+        veto, kinematics = get_root_data(jobs['path'], "ship.conical.MuonBack-TGeant4.root",
                              batch_split,
                              weight=W, sc_weight=W_sc, tfilter=True)
-        return X, W, W_sc, fcn_vals
+        return X, W, W_sc, veto, kinematics
     except Exception as e:
         print(e)
 

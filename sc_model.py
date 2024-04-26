@@ -19,7 +19,7 @@ import traceback
 import json
 import time
 import os
-import uproot as uproot
+import uproot3 as uproot
 import sys
 from kub_interface import *
 # from uproot.write.objects.TTree import newtree, newbranch
@@ -295,12 +295,12 @@ class SHiPModel(YModel):
         return self._device
 
     def _request_data(self, uuid, wait=True, check_dims=True):
-        r = get_by_uuid(uuid)   #requests.post("{}/retrieve_result".format(self._address), json={"uuid": uuid})
+        r = retrieve_result(uuid)   #requests.post("{}/retrieve_result".format(self._address), json={"uuid": uuid})
         # r = json.loads(r.content)
         if wait:
             while r["container_status"] not in ["exited", "failed"]:
                 time.sleep(2.)
-                r = get_by_uuid(uuid)#requests.post("{}/retrieve_result".format(self._address), json={"uuid": uuid})
+                r = retrieve_result(uuid)#requests.post("{}/retrieve_result".format(self._address), json={"uuid": uuid})
                 #r = json.loads(r.content)
             if r["container_status"] == "failed":
                 raise ValueError("Generation has failed with error {}".format(r.get("message", None)))
@@ -322,13 +322,16 @@ class SHiPModel(YModel):
                 "num_repetitions": num_repetitions
             }
         job = {}
-        r = add_job(job)
+        self.trial_id += 1
+        d['uuid'] = self.trial_id
+        r = simulate(d)#add_job(job)
+
         # r = requests.post(
         #     "{}/simulate".format(self._address),
         #     json=json.loads(json.dumps(d, cls=NumpyEncoder))
         # )
-        print(r.content, d)
-        return r.content.decode()
+        #print(r.content, d)
+        return r#.content.decode()
 
     def _generate(self, condition, num_repetitions, input_file=None, const_field=None):
         uuid = self._request_uuid(condition, num_repetitions=num_repetitions, input_file=input_file,
@@ -413,7 +416,7 @@ class SHiPModel(YModel):
         condition = torch.tensor(condition).float().to(self.device)
         condition = torch.clamp(condition, 1e-5, 1e5)
 
-        self.sample_from_gan(n_samples_per_dim + 50_000, output_path=self.path_to_output_root)
+        # self.sample_from_gan(n_samples_per_dim + 50_000, output_path=self.path_to_output_root)
         uuids, data = self._generate_multiple(condition,
                                               num_repetitions=n_samples_per_dim,
                                               input_file=self.root_filename,
@@ -599,6 +602,7 @@ class FullSHiPModel(SHiPModel):
         self.condition_key = "params"
         self.scale_psi = False
         self.params_precision = 1
+        self.trial_id = 0
 
     def sample_x(self, num_repetitions):
         # # TODO: For now use boostrap, once
@@ -624,15 +628,16 @@ class FullSHiPModel(SHiPModel):
         new_job = {'trial_index': 0,
                        'parameters': d['shape'],
                        'run_tag': 0}
-
-        add_job(new_job, new_dir)
+        self.trial_id += 1
+        d['uuid'] = self.trial_id
+        r = simulate(d)#add_job(new_job, new_dir)
 
         # r = requests.post(
         #     "{}/simulate".format(self._address),
         #     json=json.loads(json.dumps(d))
         # )
         # print("content", r.content)
-        return 0#r.content.decode()
+        return r#r.content.decode()
 
     def request_params(self, condition):
         d = {"shape": list(map(lambda x: round(x, self.params_precision), condition.detach().cpu().numpy().tolist()))}
@@ -830,12 +835,16 @@ class SimpleSHiPModel(YModel):
                           'Y_begin': y_begin, "Y_end": y_end, 'Z': z},
                 "num_repetitions": num_repetitions
             }
-        r = requests.post(
-            "{}/simulate".format(self._address),
-            json=json.loads(json.dumps(d, cls=NumpyEncoder))
-        )
-        print(r.content, d)
-        return r.content.decode()
+        self.trial_id += 1
+        d['uuid'] = self.trial_id
+        r = simulate(d)
+
+        # r = requests.post(
+        #     "{}/simulate".format(self._address),
+        #     json=json.loads(json.dumps(d, cls=NumpyEncoder))
+        # )
+        # print(r.content, d)
+        return r#.content.decode()
 
     def _loss(self, data):
         data['muons_momentum'] = np.array(data['muons_momentum'])
