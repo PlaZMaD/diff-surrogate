@@ -213,7 +213,7 @@ def ProcessPoint4Server(jobs):
     try:
         X, W, W_sc = get_params_from_json(os.path.join(jobs['path'], "0", 'optimise_input.json'))
         print(X, W)
-        veto, kinematics = get_root_data(jobs['path'], "ship.conical.MuonBack-TGeant4.root",
+        veto, kinematics = calc_FCNs(jobs['path'], "ship.conical.MuonBack-TGeant4.root",
                              batch_split,
                              weight=W, sc_weight=W_sc, tfilter=True)
         return X, W, W_sc, veto, kinematics
