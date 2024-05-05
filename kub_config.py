@@ -23,11 +23,11 @@ max_batch_N = 40
 batch_split = 20
 
 # pool_dir = 'json_config'#../json_config/'
-pool_dir = '../json_config/'
+pool_dir = '/home/ekurbatov/shipfs/optimization/json_control/'
 
 default_point = [70, 170, 0, 353.078, 125.083, 184.834, 150.193, 186.812, 40, 40, 150, 150, 2, 2, 80, 80, 150, 150, 2, 2, 72, 51, 29, 46, 10, 7, 45.6888, 45.6888, 22.1839, 22.1839, 27.0063, 16.2448, 10, 31, 35, 31, 51, 11, 24.7961, 48.7639, 8, 104.732, 15.7991, 16.7793, 3, 100, 192, 192, 2, 4.8004, 3, 100, 8, 172.729, 46.8285, 2]
 need2opt = [ 4, 5, 6, 7] + [i for i in  range(38, len(default_point))]
-
+run_tag = "first_try"
 
 JOB_SPEC = {
     "apiVersion": "batch/v1",
