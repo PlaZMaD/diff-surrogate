@@ -49,7 +49,7 @@ def listen_jobs_json():
                 jobs_pool[trial_index] = {'proc': SubmitKubJobs(parameters, str(trial_index), api), 'time': 0, 'restarts': 0,
                                           'trial': trial_index, 'parameters': opt_parameters, 'tag': job_to_run['run_tag']}
                 with open(os.path.join(run_dir, f"{trial_index}.json"), 'w') as output:
-                    json.dump(opt_parameters, output)
+                    json.dump({'parameters': opt_parameters, 'trial_index': trial_index}, output)
 
         completed = []
         for jobID, job in jobs_pool.items():

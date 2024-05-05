@@ -12,7 +12,7 @@ def retrieve_result(uuid):
 
     #check in running and new
     job_list = get_jobs_list_client(run_dir) + get_jobs_list_client(new_dir)
-    print(job_list)
+    # print(job_list)
     job_list_uuid = [job['trial_index'] for job in job_list]
     out = {}
     if uuid in job_list_uuid:
