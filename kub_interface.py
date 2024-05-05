@@ -21,7 +21,7 @@ def retrieve_result(uuid):
     my_job = [job for job in get_jobs_list_client(completed_dir) if job['trial_index'] == uuid]
     if len(my_job) != 1:
         out['container_status'] = 'running'
-        print("Too many jobs or job is not found", my_job)
+        # print("Too many jobs or job is not found", my_job)
         return out
     else:
         my_job = my_job[0]

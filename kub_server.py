@@ -105,7 +105,6 @@ def listen_jobs_json():
 
                 json_db.append({'iteration': job['trial'],
                                 'W': W,
-                                'fcns': y_new,
                                 'parameters': X_new,
                                'tag': job['tag']})
                 with open("json_db.json", 'w') as out:
