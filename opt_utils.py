@@ -10,7 +10,7 @@ import os
 from sklearn.ensemble import GradientBoostingRegressor
 
 from kub_config import *
-import uproot
+import uproot4 as uproot
 from os.path import isfile, join
 from copy import deepcopy
 import awkward1 as ak
