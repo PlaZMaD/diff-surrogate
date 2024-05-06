@@ -193,8 +193,8 @@ def calc_FCNs(dirName, fileName, nFiels, weight, sc_weight, tfilter=True, accept
     if tfilter:
         # if white_list is not None:
         reduced = reduced[reduced['event_id'].isin(white_list)]
-        veto = reduced[['fX', 'fY']].values.tolist()
-        kinematics = reduced[['fX','fY','fZ', 'fX','fY','fZ','fPdgCode']].values.tolist()
+        veto = reduced[['fX', 'fY']].values#.tolist()
+        kinematics = reduced[['fX','fY','fZ', 'fX','fY','fZ','fPdgCode']].values#.tolist()
     return veto, kinematics
 
 def params2opt(inParams):
