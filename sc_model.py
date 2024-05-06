@@ -615,7 +615,15 @@ class FullSHiPModel(SHiPModel):
         # return self.saved_muon_input_kinematics[sample_indices]
 
         # Using muGAN to generate samples
-        return self.sample_from_gan(num_repetitions, output_path=None)
+        #return self.sample_from_gan(num_repetitions, output_path=None)
+        p = np.random.uniform(low=1, high=10, size=num_repetitions)  # energy gen
+        phi = np.random.uniform(low=0, high=2 * np.pi, size=num_repetitions)
+        theta = np.random.uniform(low=0, high=10 * np.pi / 180)
+        pz = p * np.cos(theta)
+        px = p * np.sin(theta) * np.sin(phi)
+        py = p * np.sin(theta) * np.cos(phi)
+        particle_type = np.random.choice([-13., 13.], size=num_repetitions)
+        return torch.tensor(np.c_[px, py, pz, particle_type]).float().to(self.device)
 
     def _request_uuid(self, condition, num_repetitions, input_file, const_field):
         d = {"shape": list(map(lambda x: round(x, self.params_precision), condition.detach().cpu().numpy().tolist())),
