@@ -616,6 +616,8 @@ class FullSHiPModel(SHiPModel):
 
         # Using muGAN to generate samples
         #return self.sample_from_gan(num_repetitions, output_path=None)
+
+
         p = np.random.uniform(low=1, high=10, size=num_repetitions)  # energy gen
         phi = np.random.uniform(low=0, high=2 * np.pi, size=num_repetitions)
         theta = np.random.uniform(low=0, high=10 * np.pi / 180)
